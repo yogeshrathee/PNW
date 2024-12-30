@@ -1,0 +1,327 @@
+//info
+public class Info {
+    private String id;
+    private String name;
+    private String draftVersion;
+    private String deleted;
+    private String version;
+    private String author;
+    private String created;
+    private String type;
+    private String abstractData;
+    private String content;
+
+    // Default Constructor
+    public Info() {
+    }
+
+    // Constructor with all fields
+    public Info(String id, String name, String draftVersion, String deleted, String version, 
+                String author, String created, String type, String abstractData, String content) {
+        this.id = id;
+        this.name = name;
+        this.draftVersion = draftVersion;
+        this.deleted = deleted;
+        this.version = version;
+        this.author = author;
+        this.created = created;
+        this.type = type;
+        this.abstractData = abstractData;
+        this.content = content;
+    }
+
+    // Getters and Setters
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getDraftVersion() {
+        return draftVersion;
+    }
+
+    public void setDraftVersion(String draftVersion) {
+        this.draftVersion = draftVersion;
+    }
+
+    public String getDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(String deleted) {
+        this.deleted = deleted;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
+    }
+
+    public String getAuthor() {
+        return author;
+    }
+
+    public void setAuthor(String author) {
+        this.author = author;
+    }
+
+    public String getCreated() {
+        return created;
+    }
+
+    public void setCreated(String created) {
+        this.created = created;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public String getAbstractData() {
+        return abstractData;
+    }
+
+    public void setAbstractData(String abstractData) {
+        this.abstractData = abstractData;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    // toString Method
+    @Override
+    public String toString() {
+        return "Info{" +
+                "id='" + id + '\'' +
+                ", name='" + name + '\'' +
+                ", draftVersion='" + draftVersion + '\'' +
+                ", deleted='" + deleted + '\'' +
+                ", version='" + version + '\'' +
+                ", author='" + author + '\'' +
+                ", created='" + created + '\'' +
+                ", type='" + type + '\'' +
+                ", abstractData='" + abstractData + '\'' +
+                ", content='" + content + '\'' +
+                '}';
+    }
+
+    // equals Method
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Info info = (Info) o;
+        return id.equals(info.id) &&
+                name.equals(info.name) &&
+                draftVersion.equals(info.draftVersion) &&
+                deleted.equals(info.deleted) &&
+                version.equals(info.version) &&
+                author.equals(info.author) &&
+                created.equals(info.created) &&
+                type.equals(info.type) &&
+                abstractData.equals(info.abstractData) &&
+                content.equals(info.content);
+    }
+
+    // hashCode Method
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, name, draftVersion, deleted, version, author, created, type, abstractData, content);
+    }
+}
+-------------
+//
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/dual-table")
+public class DualTableController {
+
+    @Autowired
+    private DualTableService dualTableService;
+
+    @PutMapping("/save-or-update")
+    public ResponseEntity<String> saveOrUpdate(@RequestParam String id,
+                                               @RequestParam String name,
+                                               @RequestParam String draftVersion,
+                                               @RequestParam String deleted,
+                                               @RequestParam String version,
+                                               @RequestParam String author,
+                                               @RequestParam String created,
+                                               @RequestParam String type,
+                                               @RequestParam String abstractData,
+                                               @RequestParam String content,
+                                               @RequestParam boolean allowOldVersionUpdate) {
+        String result = dualTableService.saveOrUpdate(id, name, draftVersion, deleted, version, author, created, type, abstractData, content, allowOldVersionUpdate);
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/get-by-name")
+    public ResponseEntity<String> getByName(@RequestParam String name) {
+        String result = dualTableService.getRecordByName(name);
+        return ResponseEntity.ok(result);
+    }
+
+    @DeleteMapping("/delete-by-name")
+    public ResponseEntity<String> deleteByName(@RequestParam String name) {
+        String result = dualTableService.deleteRecordByName(name);
+        return ResponseEntity.ok(result);
+    }
+}
+
+-------------------------
+///
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Map;
+
+@Service
+public class DualTableService {
+
+    @Autowired
+    private DualTableMapper dualTableMapper;
+
+    @Transactional
+    public String saveOrUpdate(String id, String name, String draftVersion, String deleted,
+                               String version, String author, String created, String type,
+                               String abstractData, String content, boolean allowOldVersionUpdate) {
+
+        // Check if the record exists in both tables
+        int table1Count = dualTableMapper.countByIdInTable1(id);
+        int table2Count = dualTableMapper.countByIdInTable2(id);
+
+        if (table1Count > 0 && table2Count > 0) {
+            // Update logic
+            dualTableMapper.updateTable1(id, name, draftVersion, deleted);
+            if (allowOldVersionUpdate || !dualTableMapper.contentMatches(id, content)) {
+                dualTableMapper.updateTable2(id, version, author, created, type, abstractData, content);
+                return "Record updated successfully.";
+            }
+            return "No update needed; content matches existing record.";
+        } else if (table1Count == 0 && table2Count == 0) {
+            // Insert logic
+            dualTableMapper.insertIntoTable1(id, name, draftVersion, deleted);
+            dualTableMapper.insertIntoTable2(id, version, author, created, type, abstractData, content);
+            return "Record inserted successfully.";
+        }
+
+        return "Partial data exists; check tables for inconsistencies.";
+    }
+
+    public String getRecordByName(String name) {
+        Map<String, Object> record = dualTableMapper.getRecordByName(name);
+        if (record == null) {
+            return "Error: Record not found.";
+        }
+        return record.toString();
+    }
+
+    @Transactional
+    public String deleteRecordByName(String name) {
+        int table1Count = dualTableMapper.countByNameInTable1(name);
+        int table2Count = dualTableMapper.countByNameInTable2(name);
+
+        if (table1Count == 0 && table2Count == 0) {
+            return "Error: Record with the given name does not exist.";
+        }
+
+        dualTableMapper.deleteFromTable1ByName(name);
+        dualTableMapper.deleteFromTable2ByName(name);
+
+        return "Record deleted successfully.";
+    }
+}
+-----------------
+////
+import org.apache.ibatis.annotations.*;
+import org.springframework.stereotype.Repository;
+
+import java.util.Map;
+
+@Repository
+public interface DualTableMapper {
+
+    // Count by ID in Table 1
+    @Select("SELECT COUNT(*) FROM table1 WHERE id = #{id}")
+    int countByIdInTable1(@Param("id") String id);
+
+    // Count by ID in Table 2
+    @Select("SELECT COUNT(*) FROM table2 WHERE id = #{id}")
+    int countByIdInTable2(@Param("id") String id);
+
+    // Count by Name in Table 1
+    @Select("SELECT COUNT(*) FROM table1 WHERE name = #{name}")
+    int countByNameInTable1(@Param("name") String name);
+
+    // Count by Name in Table 2
+    @Select("SELECT COUNT(*) FROM table2 WHERE id IN (SELECT id FROM table1 WHERE name = #{name})")
+    int countByNameInTable2(@Param("name") String name);
+
+    // Check if content matches in Table 2
+    @Select("SELECT COUNT(*) FROM table2 WHERE id = #{id} AND content = decode(#{content}, 'escape')")
+    boolean contentMatches(@Param("id") String id, @Param("content") String content);
+
+    // Insert into Table 1
+    @Insert("INSERT INTO table1 (id, name, draft_version, deleted) VALUES (#{id}, #{name}, #{draftVersion}, #{deleted})")
+    void insertIntoTable1(@Param("id") String id, @Param("name") String name, @Param("draftVersion") String draftVersion, @Param("deleted") String deleted);
+
+    // Insert into Table 2
+    @Insert("INSERT INTO table2 (id, version, author, created, type, abstract, content) " +
+            "VALUES (#{id}, #{version}, #{author}, #{created}, #{type}, #{abstractData}, decode(#{content}, 'escape'))")
+    void insertIntoTable2(@Param("id") String id, @Param("version") String version, @Param("author") String author,
+                          @Param("created") String created, @Param("type") String type,
+                          @Param("abstractData") String abstractData, @Param("content") String content);
+
+    // Update Table 1
+    @Update("UPDATE table1 SET name = #{name}, draft_version = #{draftVersion}, deleted = #{deleted} WHERE id = #{id}")
+    void updateTable1(@Param("id") String id, @Param("name") String name, @Param("draftVersion") String draftVersion, @Param("deleted") String deleted);
+
+    // Update Table 2
+    @Update("UPDATE table2 SET version = #{version}, author = #{author}, created = #{created}, " +
+            "type = #{type}, abstract = #{abstractData}, content = decode(#{content}, 'escape') " +
+            "WHERE id = #{id}")
+    void updateTable2(@Param("id") String id, @Param("version") String version, @Param("author") String author,
+                      @Param("created") String created, @Param("type") String type,
+                      @Param("abstractData") String abstractData, @Param("content") String content);
+
+    // Get Record by Name
+    @Select("SELECT t1.id, t1.name, t2.version, t2.author, t2.created, t2.type, t2.abstract, " +
+            "encode(t2.content, 'escape') as content " +
+            "FROM table1 t1 INNER JOIN table2 t2 ON t1.id = t2.id WHERE t1.name = #{name}")
+    Map<String, Object> getRecordByName(@Param("name") String name);
+
+    // Delete from Table 1 by Name
+    @Delete("DELETE FROM table1 WHERE name = #{name}")
+    void deleteFromTable1ByName(@Param("name") String name);
+
+    // Delete from Table 2 by Name
+    @Delete("DELETE FROM table2 WHERE id IN (SELECT id FROM table1 WHERE name = #{name})")
+    void deleteFromTable2ByName(@Param("name") String name);
+}
